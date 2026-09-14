@@ -1,0 +1,11 @@
+# 这些不该进镜像：依赖目录、构建产物、以及最关键的 .env（密钥）
+**/node_modules
+**/.venv*
+**/dist
+**/__pycache__
+**/*.pyc
+backend/.env
+.npm-cache
+.git
+.github
+*.log

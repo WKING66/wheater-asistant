@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+langgraph
+langchain
+langchain-openai
+httpx
+python-dotenv

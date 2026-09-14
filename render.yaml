@@ -1,0 +1,36 @@
+# Render 蓝图：在 Render 上点「New → Blueprint」选中这个仓库，就能一键建好服务。
+# 免费档说明：实例闲置 15 分钟会休眠，下次访问有几十秒冷启动——个人用够了。
+services:
+  - type: web
+    name: weather-outfit
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/settings
+    envVars:
+      # sync: false 表示「部署时让你在网页上填」，不会写进代码仓库
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      # 下面这些不是敏感信息，直接写死；想改直接在 Render 控制台改
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com/v1
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
+      - key: SMTP_HOST
+        value: smtp.qq.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        value: 2899964923@qq.com
+      - key: PUSH_CITY
+        value: 珠海
+      - key: PUSH_EMAIL_TO
+        value: 2899964923@qq.com
+      # 云上实例会休眠，进程内定时任务不可靠；推送交给 GitHub Actions，
+      # 所以这里关掉，免得早上 7 点发两封。
+      - key: ENABLE_SCHEDULER
+        value: "0"
+      - key: WEB_DIST
+        value: /app/web
