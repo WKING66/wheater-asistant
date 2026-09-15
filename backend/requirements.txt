@@ -1,7 +1,9 @@
-fastapi
-uvicorn[standard]
-langgraph
-langchain
-langchain-openai
-httpx
-python-dotenv
+# 版本锁死：下面是实测跑通的组合（来自 2026-09-15 那次成功的 workflow 运行）。
+# 不锁版本的话，哪天某个库发大版本改了 API，云端定时任务会静默失效、你还不容易发现。
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+langgraph==1.2.11
+langchain==1.4.0
+langchain-openai==1.6.2
+httpx==0.28.1
+python-dotenv==1.2.3
