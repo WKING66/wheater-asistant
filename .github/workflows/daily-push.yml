@@ -2,10 +2,15 @@ name: 每日穿搭推送
 
 on:
   schedule:
-    # 注意：GitHub 的 cron 用 UTC 时间。
-    # 北京时间 07:00 = UTC 前一天 23:00，所以这里写 0 23 * * *
+    # GitHub 的 cron 用 UTC：北京时间 07:00 = UTC 前一天 23:00。
+    # ⚠️ 但这个触发器现在很不可靠：2026-08 起 GitHub 调度器大面积延迟（本仓库实测晚到 113 分钟），
+    #    所以它只当兜底。准点触发交给外部定时器（cron-job.org）打 workflow_dispatch。
     - cron: '0 23 * * *'
-  workflow_dispatch: {} # 加了这个，网页上会多一个「手动运行」按钮，方便测试
+  workflow_dispatch: {} # 手动触发入口，也是外部定时器调用的入口
+
+permissions:
+  contents: read
+  actions: read # 需要读运行历史，用来判断今天是否已经推过
 
 jobs:
   push:
@@ -18,10 +23,31 @@ jobs:
           python-version: '3.11'
           cache: pip
 
+      # 两个触发源（外部定时器 + GitHub 自带 cron）都可能在同一天命中，
+      # 这里查「北京时间今天」有没有成功记录：有就跳过，避免一天收到两封邮件；
+      # 顺带的好处是——早上那次如果失败了，兜底那次会自动重试。
+      - name: 今天是否已推送过
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CUTOFF=$(TZ=Asia/Shanghai date -d "today 00:00" +%s)
+          N=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow daily-push.yml \
+                --status success --limit 30 --json createdAt \
+                --jq "[.[] | select((.createdAt|fromdateiso8601) >= $CUTOFF)] | length" 2>/dev/null || echo 0)
+          echo "北京时间今天已有 $N 次成功推送"
+          if [ "${N:-0}" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 安装依赖
+        if: steps.check.outputs.skip != 'true'
         run: pip install -r backend/requirements.txt
 
       - name: 生成并发送今日建议
+        if: steps.check.outputs.skip != 'true'
         working-directory: backend
         env:
           # 这些值存在仓库的 Settings → Secrets and variables → Actions 里
