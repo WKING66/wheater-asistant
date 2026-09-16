@@ -244,9 +244,41 @@ GitHub Actions 免费额度：公开仓库无限，私有仓库每月 2000 分�
 ### 注意点
 
 - GitHub cron 用 **UTC**：北京 07:00 要写 `0 23 * * *`（workflow 里已写好）。
-- 定时任务**不保证准点**，高峰期可能延迟几分钟到几十分钟；对天气推送完全够用。
+- ⚠️ **GitHub 自带的定时器现在很不可靠**：2026-08 起大面积延迟甚至漏触发，本仓库实测**晚到 113 分钟**。
+  所以现在的方案是「外部定时器准点触发 + GitHub cron 兜底」，见下一节。
 - **公开仓库 60 天无提交会被自动停掉定时任务**（私有仓库没这限制）。真被停了，去 Actions 页面点 Enable。
-- 想本地也保留定时：本地后端照旧跑着就行，两边互不影响（但别同时开，会重复发）。
+- 想本地也保留定时：本地后端照旧跑着就行（但别和云端同时开，会重复发）。
+
+### 一之二、让推送准点：外部定时器打 workflow_dispatch
+
+GitHub 的 `schedule` 从 2026-08 起大面积延迟甚至完全漏触发，社区通用解法是**用外部定时器调 GitHub 的
+`workflow_dispatch` API**，实测秒级触发。这里用 [cron-job.org](https://cron-job.org)（免费，邮箱注册即可，不要卡）。
+
+**① 生成一个最小权限 token**（别用那种能操作所有仓库的经典 token）：
+
+1. 打开 <https://github.com/settings/personal-access-tokens/new>
+2. Token name 填 `cron-dispatch`，Expiration 建议 1 年
+3. **Repository access** → Only select repositories → **只勾这一个仓库**
+4. **Permissions → Repository permissions → Actions** → 设为 **Read and write**（其余全部保持 No access）
+5. Generate token，复制 `github_pat_...`（只显示一次）
+
+**② 在 cron-job.org 建任务**：
+
+| 字段 | 值 |
+|---|---|
+| URL | `https://api.github.com/repos/<用户名>/<仓库名>/actions/workflows/daily-push.yml/dispatches` |
+| Schedule | Every day at **07:00**，Timezone 必须选 **Asia/Shanghai** |
+| Method | `POST` |
+| Body | `{"ref":"main"}` |
+| Header | `Authorization: Bearer github_pat_你的token` |
+| Header | `Accept: application/vnd.github+json` |
+| Header | `Content-Type: application/json` |
+
+**成功标志**：HTTP **204**（无响应体）。建议顺手打开 cron-job.org 的失败邮件通知。
+
+**③ 为什么不会一天收两封**：workflow 里加了判断——查「北京时间今天」有没有成功记录，有就跳过。
+外部定时器先跑成功，GitHub 兜底那次会自动跳过；如果早上那次失败了，兜底那次会自动重试。
+（`schedule` 触发的运行会先 `sleep 600`，避免两者在同一分钟撞车。）
 
 ### 二、网页 → Render（前后端同一个容器）
 
